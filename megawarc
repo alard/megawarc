@@ -61,8 +61,10 @@ import tarfile
 import zlib
 
 from optparse import OptionParser
-from ordereddict import OrderedDict
-
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 # modify tarfile.TarInfo to keep the original tar headers
 tarfile.TarInfo.orig_frombuf = tarfile.TarInfo.frombuf
