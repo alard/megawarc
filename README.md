@@ -40,11 +40,18 @@ One line with a JSON object per file in the .tar.
 Usage
 -----
 ```
-megawarc build FILE
+megawarc convert FILE
 ```
 
 Converts the tar file (containing .warc.gz files) to a megawarc.
 It creates FILE.warc.gz, FILE.tar and FILE.json.gz from FILE.
+
+```
+megawarc pack FILE INFILE_1 [[INFILE_2] ...]
+```
+Creates a megawarc with basename FILE and recursively adds the
+given files and directories to it, as if they were in a tar file.
+It creates FILE.warc.gz, FILE.tar and FILE.json.gz.
 
 ```
 megawarc restore FILE
