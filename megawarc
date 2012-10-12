@@ -281,14 +281,16 @@ class MegawarcPacker(object):
     entry.mtime = statres.st_mtime
     entry.type = tarfile.REGTYPE
 
+    tar_header = entry.tobuf()
+
     # find position in imaginary tar
     entry.offset = self.tar_pos
 
     # calculate position of tar entry
-    block_size = (tarfile.BLOCKSIZE +  # header
+    block_size = (len(tar_header) +    # header
                   entry.size +         # data
                   (tarfile.BLOCKSIZE - entry.size) % tarfile.BLOCKSIZE)
-    data_offset = entry.offset + tarfile.BLOCKSIZE
+    data_offset = entry.offset + len(tar_header)
     next_offset = entry.offset + block_size
 
     # move to next position in imaginary tar
@@ -327,7 +329,7 @@ class MegawarcPacker(object):
       tar_offset = tar_out.tell()
       if self.verbose:
         print >>sys.stderr, "Copying %s to tar" % filename
-      tar_out.write(entry.tobuf())
+      tar_out.write(tar_header)
       copy_to_stream(tar_out, filename, 0, entry.size)
       padding = (tarfile.BLOCKSIZE - entry.size) % tarfile.BLOCKSIZE
       if padding > 0:
@@ -343,7 +345,7 @@ class MegawarcPacker(object):
     d["target"] = d_target
     d["src_offsets"] = d_src_offsets
     d["header_fields"] = entry.get_info("utf-8", {})
-    d["header_string"] = entry.tobuf()
+    d["header_string"] = tar_header
 
     # store metadata
     json.dump(d, json_out, separators=(',', ':'))
