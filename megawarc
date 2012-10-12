@@ -143,7 +143,7 @@ def test_gz(filename, offset, size, verbose=False):
         buf = gz.read(4096)
         if len(buf) == 0:
           break
-    except (IOError, ValueError) as e:
+    except (IOError, ValueError, zlib.error) as e:
       if verbose:
         print >>sys.stderr, e
       return False
