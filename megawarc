@@ -71,16 +71,6 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-# modify tarfile.TarInfo to keep the original tar headers
-tarfile.TarInfo.orig_frombuf = tarfile.TarInfo.frombuf
-@classmethod
-def keepbuf_frombuf(cls, buf):
-  entry = cls.orig_frombuf(buf)
-  entry.buf = buf
-  return entry
-tarfile.TarInfo.frombuf = keepbuf_frombuf
-
-
 # open input_filename and write the data from offset to
 # (offset+size) to stream
 def copy_to_stream(stream, input_filename, offset, size):
@@ -175,16 +165,19 @@ class MegawarcBuilder(object):
               tar_out.write("\0" * padding)
 
   def process_entry(self, entry, warc_out, tar_out, json_out):
+    with open(self.input_filename, "r") as tar:
+      tar.seek(entry.offset)
+      tar_header = tar.read(entry.offset_data - entry.offset)
+
     # calculate position of tar entry
-    block_size = (tarfile.BLOCKSIZE +  # header
+    block_size = (len(tar_header) +    # header
                   entry.size +         # data
                   (tarfile.BLOCKSIZE - entry.size) % tarfile.BLOCKSIZE)
-    data_offset = entry.offset + tarfile.BLOCKSIZE
     next_offset = entry.offset + block_size
 
     d_src_offsets = OrderedDict()
     d_src_offsets["entry"] = entry.offset
-    d_src_offsets["data"] = data_offset
+    d_src_offsets["data"] = entry.offset_data
     d_src_offsets["next_entry"] = next_offset
 
     # decide what to do with this entry
@@ -192,7 +185,7 @@ class MegawarcBuilder(object):
     if entry.isfile() and re.search(r"\.warc\.gz", entry.name):
       if self.verbose:
         print >>sys.stderr, "Checking %s" % entry.name
-      valid_warc_gz = test_gz(self.input_filename, data_offset, entry.size, self.verbose)
+      valid_warc_gz = test_gz(self.input_filename, entry.offset_data, entry.size, self.verbose)
       if not valid_warc_gz:
         if self.verbose:
           print >>sys.stderr, "Invalid gzip %s" % entry.name
@@ -204,7 +197,7 @@ class MegawarcBuilder(object):
       warc_offset = warc_out.tell()
       if self.verbose:
         print >>sys.stderr, "Copying %s to warc" % entry.name
-      copy_to_stream(warc_out, self.input_filename, data_offset, entry.size)
+      copy_to_stream(warc_out, self.input_filename, entry.offset_data, entry.size)
 
       d_target["container"] = "warc"
       d_target["offset"] = warc_offset
@@ -226,7 +219,7 @@ class MegawarcBuilder(object):
     d["target"] = d_target
     d["src_offsets"] = d_src_offsets
     d["header_fields"] = entry.get_info("utf-8", {})
-    d["header_string"] = entry.buf
+    d["header_string"] = tar_header
 
     # store metadata
     json.dump(d, json_out, separators=(',', ':'))
