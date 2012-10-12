@@ -63,6 +63,7 @@ import os.path
 import re
 import sys
 import tarfile
+import zlib
 
 from optparse import OptionParser
 try:
