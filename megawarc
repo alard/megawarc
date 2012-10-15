@@ -37,8 +37,11 @@ One line with a JSON object per file in the .tar.
    "header_fields": {
      ...                           (parsed fields from the tar header)
    },
-   "header_string": string         (the tar header for this entry)
+   "header_base64": string         (the base64-encoded tar header)
 }
+
+In older megawarcs the header is sometimes not base64-encoded:
+   "header_string": string         (the tar header for this entry)
 
 
 USAGE
@@ -57,6 +60,7 @@ megawarc restore FILE
   It reads FILE.warc.gz, FILE.tar and FILE.json.gz to make FILE.
 """
 
+import base64
 import gzip
 import json
 import os.path
@@ -219,7 +223,7 @@ class MegawarcBuilder(object):
     d["target"] = d_target
     d["src_offsets"] = d_src_offsets
     d["header_fields"] = entry.get_info("utf-8", {})
-    d["header_string"] = tar_header
+    d["header_base64"] = base64.b64encode(tar_header)
 
     # store metadata
     json.dump(d, json_out, separators=(',', ':'))
@@ -338,7 +342,7 @@ class MegawarcPacker(object):
     d["target"] = d_target
     d["src_offsets"] = d_src_offsets
     d["header_fields"] = entry.get_info("utf-8", {})
-    d["header_string"] = tar_header
+    d["header_base64"] = base64.b64encode(tar_header)
 
     # store metadata
     json.dump(d, json_out, separators=(',', ':'))
@@ -371,7 +375,12 @@ class MegawarcRestorer(object):
     if entry["target"]["container"] == "warc":
       if self.verbose:
         print >>sys.stderr, "Copying %s from warc" % entry["header_fields"]["name"]
-      tar_out.write(entry["header_string"])
+      if "header_base64" in entry:
+        tar_out.write(base64.b64decode(entry["header_base64"]))
+      elif "header_string" in entry:
+        tar_out.write(entry["header_string"])
+      else:
+        raise Exception("Missing header_string or header_base64.")
       copy_to_stream(tar_out, self.input_warc_filename,
                      entry["target"]["offset"], entry["target"]["size"])
       padding = (tarfile.BLOCKSIZE - entry["target"]["size"]) % tarfile.BLOCKSIZE
