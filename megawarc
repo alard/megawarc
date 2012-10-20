@@ -76,23 +76,65 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
+class ProgressInfo(object):
+  def __init__(self, maximum):
+    self._current = 0
+    self._maximum = maximum
+    self._previous_percentage = None
+    self._active = sys.stderr.isatty()
+    self.print_status()
+
+  def update(self, new_value):
+    self._current = new_value
+    self.print_status()
+
+  def print_status(self):
+    if not self._active:
+      return
+
+    percentage = int(float(self._current) / float(self._maximum) * 100)
+    if self._maximum < 0:
+      # count down
+      percentage = -percentage
+    percentage = max(0, min(100, percentage))
+    if self._previous_percentage != percentage:
+      self._previous_percentage = percentage
+      sys.stderr.write("\r %3d%%" % percentage)
+
+  def clear(self):
+    if self._active:
+      sys.stderr.write("\r     \r")
+      self._active = False
+
+
 # open input_filename and write the data from offset to
 # (offset+size) to stream
-def copy_to_stream(stream, input_filename, offset, size):
-  with open(input_filename, "r") as f:
-    f.seek(offset)
+def copy_to_stream(stream, input_filename, offset, size, verbose=False):
+  if verbose and size > 10 * 1024 * 1024:
+    progress = ProgressInfo(-size)
+  else:
+    progress = None
 
-    to_read = size
-    while to_read > 0:
-      buf_size = min(to_read, 4096)
-      buf = f.read(buf_size)
-      l = len(buf)
-      if l < buf_size:
-        raise Exception("End of file: %d bytes expected, but %d bytes read." % (buf_size, l))
-      stream.write(buf)
-      to_read -= l
+  try:
+    with open(input_filename, "r") as f:
+      f.seek(offset)
 
-  stream.flush()
+      to_read = size
+      while to_read > 0:
+        buf_size = min(to_read, 4096)
+        buf = f.read(buf_size)
+        l = len(buf)
+        if l < buf_size:
+          raise Exception("End of file: %d bytes expected, but %d bytes read." % (buf_size, l))
+        stream.write(buf)
+        to_read -= l
+        if progress:
+          progress.update(-to_read)
+
+    stream.flush()
+  finally:
+    if progress:
+      progress.clear()
 
 
 # part of a stream as a file
@@ -165,6 +207,10 @@ class CopyReader(object):
 def test_gz(filename, offset, size, verbose=False, copy_to_file=None):
   with open(filename, "r") as f_stream:
     f = RangeFile(f_stream, offset, size)
+    if verbose and size > 10 * 1024 * 1024:
+      progress = ProgressInfo(-size)
+    else:
+      progress = None
     if copy_to_file:
       f = CopyReader(f, copy_to_file)
       start_pos = copy_to_file.tell()
@@ -178,6 +224,8 @@ def test_gz(filename, offset, size, verbose=False, copy_to_file=None):
         while True:
           buf = f.read(4096)
           size -= len(buf)
+          if progress:
+            progress.update(-size)
           if len(buf) > 0:
             gz.stdin.write(buf)
           else:
@@ -186,7 +234,11 @@ def test_gz(filename, offset, size, verbose=False, copy_to_file=None):
         ret = gz.wait()
         if ret != 0:
           raise IOError("Could not decompress warc.gz. gunzip returned %d." % ret)
+        if progress:
+          progress.clear()
     except (IOError, OSError) as e:
+      if progress:
+        progress.clear()
       if verbose:
         print >>sys.stderr, e
       if copy_to_file:
