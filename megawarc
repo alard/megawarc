@@ -169,24 +169,23 @@ def test_gz(filename, offset, size, verbose=False, copy_to_file=None):
       f = CopyReader(f, copy_to_file)
       start_pos = copy_to_file.tell()
     try:
-      gz = subprocess.Popen(["gunzip", "-t", "-q"],
-                            shell=False,
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-      while True:
-        buf = f.read(4096)
-        size -= len(buf)
-        if len(buf) > 0:
-          gz.stdin.write(buf)
-        else:
-          break
-      gz.stdin.close()
-      gz.stdout.close()
-      gz.stderr.close()
-      ret = gz.wait()
-      if ret != 0:
-        raise IOError("Could not decompress warc.gz. gunzip returned %d." % ret)
+      with open("/dev/null", "w") as dev_null:
+        gz = subprocess.Popen(["gunzip", "-tv"],
+                              shell=False,
+                              stdin=subprocess.PIPE,
+                              stdout=dev_null,
+                              stderr=dev_null)
+        while True:
+          buf = f.read(4096)
+          size -= len(buf)
+          if len(buf) > 0:
+            gz.stdin.write(buf)
+          else:
+            break
+        gz.stdin.close()
+        ret = gz.wait()
+        if ret != 0:
+          raise IOError("Could not decompress warc.gz. gunzip returned %d." % ret)
     except (IOError, OSError) as e:
       if verbose:
         print >>sys.stderr, e
