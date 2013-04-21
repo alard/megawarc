@@ -130,8 +130,6 @@ def copy_to_stream(stream, input_filename, offset, size, verbose=False):
         to_read -= l
         if progress:
           progress.update(-to_read)
-
-    stream.flush()
   finally:
     if progress:
       progress.clear()
@@ -265,7 +263,6 @@ class MegawarcBuilder(object):
             for tarinfo in tar:
               self.process_entry(tarinfo, warc_out, tar_out, json_out)
 
-            tar_out.flush()
             padding = (tarfile.RECORDSIZE - tar_out.tell()) % tarfile.RECORDSIZE
             if padding > 0:
               tar_out.write("\0" * padding)
@@ -358,7 +355,6 @@ class MegawarcPacker(object):
             elif os.path.isfile(filename):
               self.process_file(filename, warc_out, tar_out, json_out)
 
-          tar_out.flush()
           padding = (tarfile.RECORDSIZE - tar_out.tell()) % tarfile.RECORDSIZE
           if padding > 0:
             tar_out.write("\0" * padding)
@@ -430,7 +426,6 @@ class MegawarcPacker(object):
       padding = (tarfile.BLOCKSIZE - entry.size) % tarfile.BLOCKSIZE
       if padding > 0:
         tar_out.write("\0" * padding)
-      tar_out.flush()
 
       d_target["container"] = "tar"
       d_target["offset"] = tar_offset
@@ -464,7 +459,6 @@ class MegawarcRestorer(object):
           entry = json.loads(line)
           self.process_entry(entry, tar_out)
 
-        tar_out.flush()
         padding = (tarfile.RECORDSIZE - tar_out.tell()) % tarfile.RECORDSIZE
         if padding > 0:
           tar_out.write("\0" * padding)
