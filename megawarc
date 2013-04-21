@@ -95,7 +95,7 @@ class ProgressInfo(object):
     percentage = int(float(self._current) / float(self._maximum) * 100)
     if self._maximum < 0:
       # count down
-      percentage = -percentage
+      percentage = 100-percentage
     percentage = max(0, min(100, percentage))
     if self._previous_percentage != percentage:
       self._previous_percentage = percentage
